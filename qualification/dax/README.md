@@ -59,7 +59,7 @@ prior successful benchmarks do not establish stability. Do not deploy this candi
 
 Reports are snapshots from /home/claire/inference-setup/hosts/dax/qualification/;
 relative results/ links refer there. Raw logs, WAVs, archives and models are not
-published. Fork build integration still needs a fresh full qualification.
+published. Fresh fork build integration passed on Dax; see FORK-BUILD-RESULT.md. Runtime qualification remains incomplete.
 
 One paired test improved 11.497s audio synthesis from 12.131s to 7.562s,
 first PCM 814ms to 336ms. Two overlapping requests took about 14.4s each and
