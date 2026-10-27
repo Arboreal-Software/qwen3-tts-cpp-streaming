@@ -8,6 +8,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cstdlib>
+#include <filesystem>
 using Clock=std::chrono::steady_clock;
 static double ms(Clock::time_point a,Clock::time_point b){return std::chrono::duration<double,std::milli>(b-a).count();}
 int main(int argc,char**argv){
@@ -20,6 +21,11 @@ int main(int argc,char**argv){
  for(int turn=0;turn<4;++turn){
   bool intermediate=turn==2;bool cancel=intermediate&&std::getenv("DAX_COMPLETE_INTERMEDIATE")==nullptr;int calls=0;bool cancel_requested=false;int after_cancel=0;
   double first=-1;Clock::time_point cancelled;std::vector<float> pcm;
+  if (const char * root=std::getenv("DAX_PROBE_TRACE_ROOT")) {
+   const std::string trace=std::string(root)+"/turn-"+std::to_string(turn);
+   if (!std::filesystem::create_directory(trace)) {fprintf(stderr,"Trace directory must be new\n");return 6;}
+   if (setenv("ARBOREAL_TRACE_WINDOWS",trace.c_str(),1)!=0)return 6;
+  }
   auto began=Clock::now();
   bool ok=engine.synthesize_streaming(intermediate?"This request should stop after the first audio chunk. The rest of this fairly long sentence must not keep speaking after interruption.":"Dax is ready for a voice test. This sentence checks clear speech and timing.",o,[&](const TtsStreamChunk& c){
    if(cancel_requested)++after_cancel;

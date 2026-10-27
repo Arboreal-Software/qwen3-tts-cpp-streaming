@@ -9,6 +9,8 @@
 #include <cstdio>
 #include <cstdint>
 #include <deque>
+#include <fstream>
+#include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <random>
@@ -1192,6 +1194,29 @@ tts_result pipeline_internal::ops::synthesize_internal(Qwen3TTS & self,
             std::vector<int32_t> local_codes;
         };
 
+        // Explicit diagnostic only: audio codes/PCM can contain private speech.
+        // Capture the directory once per synthesis; the caller creates it.
+        const char * trace_env = std::getenv("ARBOREAL_TRACE_WINDOWS");
+        const std::string trace_directory = trace_env ? trace_env : "";
+        auto trace_window = [&](const DecodeJob & job, const char * suffix,
+                                const void * data, size_t bytes) -> bool {
+            if (trace_directory.empty()) return true;
+            std::ofstream out(trace_directory + "/window-" + std::to_string(job.index) + suffix,
+                              std::ios::binary | std::ios::trunc);
+            // Native-endian int32 header, then int32 codes or float32 decoder PCM.
+            const int32_t header[] = {job.ctx_start, job.new_start, job.end_frame,
+                                      n_codebooks, int32_t(job.is_final)};
+            out.write(reinterpret_cast<const char *>(header), sizeof(header));
+            out.write(static_cast<const char *>(data), bytes);
+            out.close();
+            if (!out) {
+                stream_error_msg = "Failed qualification window trace";
+                stream_error.store(true);
+                return false;
+            }
+            return true;
+        };
+
         auto process_decode_job = [&](const DecodeJob & job) -> bool {
             std::vector<float> decoded;
             const int64_t dequeue_ms = get_time_ms() - t_generate_start;
@@ -1204,11 +1229,13 @@ tts_result pipeline_internal::ops::synthesize_internal(Qwen3TTS & self,
                             job.local_frames);
                 }
             }
+            if (!trace_window(job, ".codes", job.local_codes.data(), job.local_codes.size() * sizeof(int32_t))) return false;
             if (!self.audio_decoder_.decode(job.local_codes.data(), job.local_frames, decoded)) {
                 stream_error_msg = "Failed streaming decode: " + self.audio_decoder_.get_error();
                 stream_error.store(true);
                 return false;
             }
+            if (!trace_window(job, ".pcm", decoded.data(), decoded.size() * sizeof(float))) return false;
             const int64_t decode_end_abs_ms = get_time_ms();
             const int64_t decode_ms = decode_end_abs_ms - decode_start_ms;
             const int64_t decode_end_ms = decode_end_abs_ms - t_generate_start;
