@@ -215,9 +215,17 @@ public:
     }
 
     const std::string & last_error() const { return last_error_; }
+#ifdef _WIN32
     int64_t first_submit_ms() const { return first_submit_ms_.load(); }
     int64_t first_starvation_ms() const { return first_starvation_ms_.load(); }
     int32_t starvation_events() const { return starvation_events_.load(); }
+#else
+    // No local playback implementation on Linux. Preserve unavailable timing
+    // sentinels; streaming callbacks and browser playback are measured separately.
+    int64_t first_submit_ms() const { return -1; }
+    int64_t first_starvation_ms() const { return -1; }
+    int32_t starvation_events() const { return 0; }
+#endif
     double queued_audio_ms() const {
 #ifdef _WIN32
         std::lock_guard<std::mutex> lock(mutex_);
