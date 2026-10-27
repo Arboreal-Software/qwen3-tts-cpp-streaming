@@ -21,3 +21,9 @@ browser audio and deployment control in separate repositories.
   FP16 arithmetic. Keep host dependencies minimal and builds containerized.
 - History-dependent waveform variation is unresolved, not proof of cancellation corruption.
   Verify spoken content and isolation before conclusions.
+
+Owner clarification (2026-10-27): exact waveform equality is not required and
+history-dependent variation alone is not a deployment blocker. Prioritize spoken
+content, perceptual quality, cross-user isolation and repeated/interrupted request
+stability. If those pass, document and accept variation. Keep CUDA crash/recovery
+qualification independent; good audio does not prove runtime safety.

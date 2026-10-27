@@ -1,3 +1,9 @@
+> Updated acceptance (owner, 2026-10-27): the historical exit4 below was a
+> deliberately strict exact-equality diagnostic. It is not automatically an
+> audible defect or deployment blocker. Current gates are spoken-content
+> accuracy, perceptual quality, cross-user isolation and stability. CUDA safety
+> remains separate. The current probe reports inequality without failing for it.
+
 # Persistent Qwen3-TTS reuse and cancellation — preliminary failure
 
 Actual Dax GTX1080, isolated candidate library, one loaded engine, deterministic seed42, unpaced callbacks. Probe sequence: same sentence twice, different long sentence cancelled after first audio callback, original sentence again. Source tts-persistent-probe.cpp; run-persistent-probe.sh. This is a library test, not network/UI interruption qualification.

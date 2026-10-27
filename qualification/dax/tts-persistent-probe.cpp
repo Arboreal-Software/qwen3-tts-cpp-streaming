@@ -17,9 +17,15 @@ int main(int argc,char**argv){
  if(!engine.load(argv[1],"qwen3-tts-0.6b-f16")||!engine.load_speaker_embedding(argv[2]))return 3;
  printf("PERSISTENT load_ms=%.3f\n",ms(start,Clock::now()));
  TtsStreamOptions o;o.model_identifier="qwen3-tts-0.6b-f16";o.seed=42;o.play_streaming=false;o.print_progress=false;o.print_timing=true;o.paced_audio_delivery=false;
+ int turns=4;
+ if (const char * value=std::getenv("DAX_PROBE_TURNS")) {
+  char * end=nullptr;long parsed=std::strtol(value,&end,10);
+  if (!end || *end || parsed<4 || parsed>100)return 2;
+  turns=int(parsed);
+ }
  std::vector<float> reference;
- for(int turn=0;turn<4;++turn){
-  bool intermediate=turn==2;bool cancel=intermediate&&std::getenv("DAX_COMPLETE_INTERMEDIATE")==nullptr;int calls=0;bool cancel_requested=false;int after_cancel=0;
+ for(int turn=0;turn<turns;++turn){
+  bool intermediate=turn%4==2;bool cancel=intermediate&&std::getenv("DAX_COMPLETE_INTERMEDIATE")==nullptr;int calls=0;bool cancel_requested=false;int after_cancel=0;
   double first=-1;Clock::time_point cancelled;std::vector<float> pcm;
   if (const char * root=std::getenv("DAX_PROBE_TRACE_ROOT")) {
    const std::string trace=std::string(root)+"/turn-"+std::to_string(turn);
@@ -60,7 +66,9 @@ int main(int argc,char**argv){
   bool equal=turn==0||intermediate||(pcm.size()==reference.size()&&memcmp(pcm.data(),reference.data(),pcm.size()*sizeof(float))==0);
   printf("PERSISTENT turn=%d success=%d first_ms=%.3f total_ms=%.3f samples=%zu calls=%d cancel_return_ms=%.3f callbacks_after_cancel=%d equal_reference=%d\n",turn,int(ok),first,ms(began,ended),pcm.size(),calls,cancel_requested?ms(cancelled,ended):-1,after_cancel,int(equal));fflush(stdout);
   if(turn==0)reference=pcm;
-  if(!intermediate&&(!ok||pcm.empty()||!equal))return 4;
+  // Waveform equality is diagnostic, not an audible-quality or isolation gate.
+  if(!cancel&&(!ok||pcm.empty()))return 4;
+  if(!std::all_of(pcm.begin(),pcm.end(),[](float v){return std::isfinite(v);}))return 7;
   if(cancel&&(!cancel_requested||after_cancel))return 5;
  }
  return 0;
