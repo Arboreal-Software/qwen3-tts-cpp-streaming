@@ -1,3 +1,7 @@
+# Arboreal experimental fork
+
+Development branch for containerized Pascal streaming qualification. **Not production-qualified.** See [Dax build, tests and evidence](qualification/dax/README.md) and [agent instructions](AGENTS.md). Upstream documentation and attribution follow.
+
 # qwen3-tts-cpp-streaming
 
 Native Qwen3-TTS inference in C++17 with GGML and optional CUDA acceleration. The project supports batch synthesis, incremental PCM streaming, voice cloning, CustomVoice, VoiceDesign, and a reusable C++ integration library.

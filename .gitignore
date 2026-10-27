@@ -28,3 +28,11 @@ __pycache__/
 /reference/*_segments/
 /test_output_*/
 /test_voice_design/
+
+# Arboreal qualification outputs
+build-dax/
+qualification/dax/results/
+*.gguf
+*.wav
+*.f32
+__pycache__/
