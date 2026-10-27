@@ -88,11 +88,26 @@ bool AudioTokenizerDecoder::decode_batch(const int32_t * codes, int32_t n_frames
     }
     const auto t_upload = profile_clock::now();
 
+    struct OpTimer { ggml_backend_sched_t sched; profile_clock::time_point start; } timer{state.sched, {}};
+    const bool profile_ops = std::getenv("DAX_PROFILE_DECODER_OPS") != nullptr;
+    if (profile_ops) ggml_backend_sched_set_eval_callback(state.sched,
+        [](ggml_tensor * t, bool ask, void * data) -> bool {
+            auto & timer = *static_cast<OpTimer *>(data);
+            if (ask) { timer.start = profile_clock::now(); return true; }
+            const double elapsed = std::chrono::duration<double, std::milli>(profile_clock::now() - timer.start).count();
+            auto backend = ggml_backend_sched_get_tensor_backend(timer.sched, t);
+            fprintf(stderr, "[op-profile] op=%s backend=%s type=%s ne=%lld,%lld,%lld,%lld ms=%.6f name=%s\n",
+                ggml_op_name(t->op), backend ? ggml_backend_name(backend) : "unknown", ggml_type_name(t->type),
+                (long long)t->ne[0], (long long)t->ne[1], (long long)t->ne[2], (long long)t->ne[3], elapsed, t->name);
+            return true;
+        }, &timer);
     if (ggml_backend_sched_graph_compute(state.sched, gf) != GGML_STATUS_SUCCESS) {
+        if (profile_ops) ggml_backend_sched_set_eval_callback(state.sched, nullptr, nullptr);
         error_msg = "Failed to compute graph";
         ggml_backend_sched_reset(state.sched);
         return false;
     }
+    if (profile_ops) ggml_backend_sched_set_eval_callback(state.sched, nullptr, nullptr);
     const auto t_compute = profile_clock::now();
 
     struct ggml_tensor * audio_tensor = state.decode_audio_tensor;
