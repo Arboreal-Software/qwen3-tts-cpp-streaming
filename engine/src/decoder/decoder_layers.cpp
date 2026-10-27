@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include "audio_tokenizer_decoder.h"
 #include "decoder/decoder_state_internal.h"
 
@@ -113,7 +114,7 @@ struct ggml_tensor * decoder_internal::ops::apply_upsample_block(struct ggml_con
     int64_t channels = x->ne[1];
     int64_t batch_size = x->ne[2];
 
-    struct ggml_tensor * x_2d = ggml_conv_transpose_1d(ctx, block.conv_w, x, 2, 0, 1);
+    struct ggml_tensor * x_2d = ggml_conv_transpose_1d(ctx, std::getenv("DAX_CUDA_TRANSPOSE_F32") ? ggml_cast(ctx, block.conv_w, GGML_TYPE_F32) : block.conv_w, x, 2, 0, 1);
 
     int64_t new_seq_len = x_2d->ne[0];
     x = ggml_reshape_3d(ctx, x_2d, new_seq_len, channels, batch_size);
@@ -210,7 +211,7 @@ struct ggml_tensor * decoder_internal::ops::apply_decoder_block(struct ggml_cont
     int64_t out_channels = block.conv_t_w->ne[1];
     int kernel_size = block.conv_t_w->ne[0];
 
-    struct ggml_tensor * x_2d = ggml_conv_transpose_1d(ctx, block.conv_t_w, x, upsample_rate, 0, 1);
+    struct ggml_tensor * x_2d = ggml_conv_transpose_1d(ctx, std::getenv("DAX_CUDA_TRANSPOSE_F32") ? ggml_cast(ctx, block.conv_t_w, GGML_TYPE_F32) : block.conv_t_w, x, upsample_rate, 0, 1);
 
     int64_t new_seq_len = x_2d->ne[0];
     x = ggml_reshape_3d(ctx, x_2d, new_seq_len, out_channels, batch_size);
