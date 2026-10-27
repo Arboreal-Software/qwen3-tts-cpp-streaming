@@ -36,3 +36,9 @@ Tests `tests/worker_protocol_test.py` execute this source with the explicit
 Pascal execution, chunk gaps, coexistence, listening quality, memory stability,
 cross-user isolation and actual CUDA crash/recovery remain qualification tasks.
 No network endpoint or live voice route is changed by building this target.
+
+A cancel for the exact most-recent completed ID is a no-op: its terminal event
+may have been in flight when the controller cancelled. It emits no second
+terminal. Cancel for an older/different ID is still fatal, including when a
+newer request is active. This avoids turning the normal completion/cancellation
+race into a process failure while retaining request ownership checks.

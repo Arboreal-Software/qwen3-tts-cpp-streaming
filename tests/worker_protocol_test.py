@@ -41,6 +41,21 @@ class Protocol(unittest.TestCase):
             if kind==b'D':break
             self.assertEqual(kind,b'A');self.assertAlmostEqual(struct.unpack('<f',data[:4])[0],.2);count+=1
         self.assertEqual(count,100)
+    def test_cancel_after_completion_does_not_poison_reuse(self):
+        w=self.w;w.send(b'S',1,b'first')
+        while w.event()[0]!=b'D':pass
+        w.send(b'C',1);w.send(b'S',2,b'second')
+        while True:
+            kind,identity,_=w.event();self.assertEqual(identity,2)
+            if kind==b'D':break
+            self.assertEqual(kind,b'A')
+
+    def test_cancel_for_older_request_is_fatal(self):
+        w=self.w;w.send(b'S',1,b'first')
+        while w.event()[0]!=b'D':pass
+        w.send(b'S',2,b'second');w.send(b'C',1)
+        self.assertEqual(w.p.wait(timeout=4),70)
+
     def test_duplicate_request_is_fatal(self):
         self.w.send(b'S',1,b'first');self.w.send(b'S',1,b'first')
         self.assertEqual(self.w.p.wait(timeout=4),70)

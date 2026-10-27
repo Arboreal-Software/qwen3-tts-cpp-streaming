@@ -91,7 +91,11 @@ int main(int argc,char** argv) {
             if(busy||id==0||id<=last||body.empty()||body.find('\0')!=std::string::npos)fail();
             current=last=id;text=std::move(body);cancelled=false;busy=pending=true;wake.notify_one();
         } else if(h[0]=='C') {
-            if(size||!busy||id!=current)fail();cancelled=true;
+            if(size||id==0||id!=current)fail();
+            // The controller may send cancellation while the terminal event is
+            // in flight. Its exact most-recent request is already settled; do
+            // not emit another terminal or poison the next request.
+            if(busy)cancelled=true;
         } else {fail();}
     }
     {std::lock_guard<std::mutex> lock(mutex);closing=true;cancelled=true;wake.notify_one();}
