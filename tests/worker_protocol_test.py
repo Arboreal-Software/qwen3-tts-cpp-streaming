@@ -68,6 +68,16 @@ class Protocol(unittest.TestCase):
         self.assertEqual(self.w.event()[:2],(b'A',1))
         self.assertEqual(self.w.p.wait(timeout=4),70)
         with self.assertRaises(EOFError):self.w.event()
+    def test_audio_duration_limit_cannot_emit_completed_or_excess_pcm(self):
+        self.w.send(b'S',1,b'duration-limit');samples=0
+        with self.assertRaises(EOFError):
+            while True:
+                kind,identity,data=self.w.event()
+                self.assertEqual((kind,identity),(b'A',1))
+                samples+=len(data)//4
+        self.assertGreater(samples,0)
+        self.assertLessEqual(samples,720000)
+        self.assertEqual(self.w.p.wait(timeout=4),70)
     def test_native_exception_is_fatal(self):
         self.w.send(b'S',1,b'throw');self.assertEqual(self.w.p.wait(timeout=4),70)
     def test_empty_success_is_fatal(self):

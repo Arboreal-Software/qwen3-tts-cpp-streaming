@@ -66,6 +66,12 @@ int main(int argc,char** argv) {
                 TtsStreamOptions options;options.model_identifier="qwen3-tts-0.6b-f16";
                 options.seed=42;options.play_streaming=false;options.print_progress=false;
                 options.require_natural_eos=true;
+                // Text-token counts underestimate some ordinary spoken phrases.
+                // Use the voice transport's hard 30-second budget instead of
+                // stopping valid speech at the upstream 5-frames/token heuristic.
+                // Each codec frame represents 80 ms; natural EOS is still required.
+                options.max_audio_tokens=375;
+                options.max_audio_frames_per_text_token=0.0f;
                 // Opt-in diagnostics stay on the bounded supervisor log pipe,
                 // never the binary audio/control pipe. Include engine EOS versus
                 // safety-limit termination when investigating incomplete speech.
@@ -77,6 +83,7 @@ int main(int argc,char** argv) {
                     if(cancelled.load())return false;
                     if(chunk.sample_rate!=24000||chunk.samples.size()>65536)fail();
                     for(float v:chunk.samples)if(!std::isfinite(v))fail();
+                    if(chunk.samples.size()>720000-emitted)fail();
                     if(!chunk.samples.empty()){emit(output,'A',id,chunk.samples.data(),uint32_t(chunk.samples.size()*sizeof(float)));emitted+=chunk.samples.size();}
                     return !cancelled.load();
                 });
