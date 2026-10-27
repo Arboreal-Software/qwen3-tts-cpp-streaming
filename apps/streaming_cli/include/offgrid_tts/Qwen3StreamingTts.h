@@ -39,6 +39,9 @@ struct TtsStreamOptions {
     int32_t max_audio_tokens = 4096;
     float max_audio_frames_per_text_token = 5.0f;
     int32_t min_dynamic_audio_tokens = 64;
+    // Partial audio may already have reached the caller. Require natural EOS
+    // when a safety/token limit must not be reported as completed speech.
+    bool require_natural_eos = false;
     bool print_progress = true;
     bool print_timing = true;
     bool dump_first_frame_profile = false;

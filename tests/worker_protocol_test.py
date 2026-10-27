@@ -63,6 +63,11 @@ class Protocol(unittest.TestCase):
         self.w.send(b'S',1,b'backpressure');self.assertEqual(self.w.p.wait(timeout=4),70)
     def test_native_failure_is_fatal(self):
         self.w.send(b'S',1,b'fail');self.assertEqual(self.w.p.wait(timeout=4),70)
+    def test_token_limit_cannot_emit_completed(self):
+        self.w.send(b'S',1,b'limit')
+        self.assertEqual(self.w.event()[:2],(b'A',1))
+        self.assertEqual(self.w.p.wait(timeout=4),70)
+        with self.assertRaises(EOFError):self.w.event()
     def test_native_exception_is_fatal(self):
         self.w.send(b'S',1,b'throw');self.assertEqual(self.w.p.wait(timeout=4),70)
     def test_empty_success_is_fatal(self):
