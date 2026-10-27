@@ -1,6 +1,8 @@
 #include "tts_transformer.h"
 #include "transformer/transformer_state_internal.h"
 #include "transformer/transformer_internal.h"
+#include "transformer/sampling_safety.h"
+#include <cstdlib>
 
 #include <algorithm>
 #include <cmath>
@@ -130,6 +132,10 @@ bool TTSTransformer::generate_streaming(const int32_t * text_tokens, int32_t n_t
     }
 
     const auto & cfg = impl_->model.config;
+    if (cfg.codec_eos_id < 0 || cfg.codec_eos_id >= cfg.codec_vocab_size) {
+        error_msg_ = "Invalid codec EOS identity";
+        return false;
+    }
     const auto & trace_cfg = transformer_internal::get_debug_trace_config();
     if (trace_cfg.enabled) {
         transformer_internal::debug_trace_write_text_line(trace_cfg, "hidden_size=" + std::to_string(cfg.hidden_size));
@@ -259,6 +265,16 @@ bool TTSTransformer::generate_streaming(const int32_t * text_tokens, int32_t n_t
                                                         {(int64_t) cfg.codec_vocab_size});
         }
 
+        if (logits.size() != size_t(cfg.codec_vocab_size) || !sampling_logits_valid(logits.data(), cfg.codec_vocab_size)) {
+            error_msg_ = "Invalid talker logits; generation stopped without EOS";
+            return false;
+        }
+        const char * diagnostic_flag = std::getenv("ARBOREAL_TTS_DIAGNOSTICS");
+        const bool eos_diagnostics = diagnostic_flag && diagnostic_flag[0] == '1' && diagnostic_flag[1] == '\0';
+        int32_t eos_rank = 0;
+        const float eos_logit = logits[cfg.codec_eos_id];
+        const float max_raw_logit = *std::max_element(logits.begin(), logits.end());
+        if (eos_diagnostics) for (float value : logits) if (value > eos_logit) ++eos_rank;
         int32_t next_token;
         if (temperature <= 0.0f) {
             next_token = argmax_generate(logits.data(), cfg.codec_vocab_size);
@@ -267,6 +283,10 @@ bool TTSTransformer::generate_streaming(const int32_t * text_tokens, int32_t n_t
                 logits[i] /= temperature;
             }
 
+            if (logits.size() != size_t(cfg.codec_vocab_size) || !sampling_logits_valid(logits.data(), cfg.codec_vocab_size)) {
+                error_msg_ = "Invalid scaled talker logits; generation stopped without EOS";
+                return false;
+            }
             if (top_k > 0 && top_k < cfg.codec_vocab_size) {
                 std::vector<std::pair<float, int32_t>> scored(cfg.codec_vocab_size);
                 for (int32_t i = 0; i < cfg.codec_vocab_size; ++i) {
@@ -290,15 +310,28 @@ bool TTSTransformer::generate_streaming(const int32_t * text_tokens, int32_t n_t
                 probs[i] = expf(logits[i] - max_logit);
                 sum += probs[i];
             }
+            if (!std::isfinite(sum) || sum <= 0.0) {
+                error_msg_ = "Invalid talker probability mass; generation stopped without EOS";
+                return false;
+            }
             for (int32_t i = 0; i < cfg.codec_vocab_size; ++i) {
                 probs[i] = (float) (probs[i] / sum);
             }
             apply_top_p(probs, cb0_top_p);
 
+            if (!sampling_probabilities_valid(probs.data(), cfg.codec_vocab_size)) {
+                error_msg_ = "Invalid talker probabilities; generation stopped without EOS";
+                return false;
+            }
             std::discrete_distribution<int32_t> dist(probs.begin(), probs.end());
             next_token = dist(impl_->rng);
         }
 
+        if (eos_diagnostics && (frame % 16 == 0 || next_token == cfg.codec_eos_id)) {
+            fprintf(stderr, "TTS_EOS frame=%d text_rows_remaining=%d capacity=%d eos_rank=%d eos_gap=%.6g sampled_eos=%d\n",
+                frame, std::max(0, trailing_len - frame), impl_->state.cache.n_ctx,
+                eos_rank, double(max_raw_logit - eos_logit), int(next_token == cfg.codec_eos_id));
+        }
         if (first_frame_profile && frame == 0 && first_frame_profile->first_cb0_sample_ms <= 0.0) {
             first_frame_profile->first_cb0_sample_ms = profile_ms_since_start();
         }

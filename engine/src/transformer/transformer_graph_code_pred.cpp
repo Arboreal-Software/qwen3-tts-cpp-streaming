@@ -304,6 +304,8 @@ struct ggml_cgraph * transformer_internal::ops::build_code_pred_step_graph(TTSTr
     const float rope_theta = cfg.code_pred_rope_theta;
     const int n_layer = cfg.code_pred_layers;
     const int n_tokens = 1;
+    const int32_t attention_ctx = n_past + n_tokens;
+    GGML_ASSERT(n_past >= 0 && attention_ctx <= impl->state.code_pred_cache.n_ctx);
 
     struct ggml_init_params params = {
         /*.mem_size   =*/ impl->state.code_pred_compute_meta[generation_step].size(),
@@ -333,7 +335,7 @@ struct ggml_cgraph * transformer_internal::ops::build_code_pred_step_graph(TTSTr
         ggml_set_input(inp_mrope_pos);
     }
 
-    struct ggml_tensor * inp_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, impl->state.code_pred_cache.n_ctx, 1);
+    struct ggml_tensor * inp_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, attention_ctx, 1);
     ggml_set_name(inp_mask, "inp_mask");
     ggml_set_input(inp_mask);
 
@@ -416,11 +418,11 @@ struct ggml_cgraph * transformer_internal::ops::build_code_pred_step_graph(TTSTr
         ggml_build_forward_expand(gf, v_updated);
 
         struct ggml_tensor * K = ggml_view_3d(ctx0, k_cache,
-            head_dim, n_kv_head, impl->state.code_pred_cache.n_ctx,
+            head_dim, n_kv_head, attention_ctx,
             k_cache->nb[1], k_cache->nb[2], 0);
 
         struct ggml_tensor * V = ggml_view_3d(ctx0, v_cache,
-            head_dim, n_kv_head, impl->state.code_pred_cache.n_ctx,
+            head_dim, n_kv_head, attention_ctx,
             v_cache->nb[1], v_cache->nb[2], 0);
 
         struct ggml_tensor * Q = ggml_permute(ctx0, Qcur, 0, 2, 1, 3);

@@ -1,6 +1,7 @@
 #include "tts_transformer.h"
 #include "transformer/transformer_state_internal.h"
 #include "transformer/transformer_internal.h"
+#include "transformer/sampling_safety.h"
 
 #include <algorithm>
 #include <cmath>
@@ -92,6 +93,7 @@ bool transformer_internal::ops::predict_codes_autoregressive_coreml(TTSTransform
 #endif
 
     auto sample_or_argmax = [&](float * logits_ptr, int32_t vocab_size) -> int32_t {
+        if (!sampling_logits_valid(logits_ptr, vocab_size)) return -1;
         if (temperature <= 0.0f) {
             return argmax_code_pred(logits_ptr, vocab_size);
         }
@@ -100,6 +102,7 @@ bool transformer_internal::ops::predict_codes_autoregressive_coreml(TTSTransform
             logits_ptr[i] /= temperature;
         }
 
+        if (!sampling_logits_valid(logits_ptr, vocab_size)) return -1;
         if (top_k > 0 && top_k < vocab_size) {
             std::vector<std::pair<float, int32_t>> scored(vocab_size);
             for (int32_t i = 0; i < vocab_size; ++i) {
@@ -123,11 +126,13 @@ bool transformer_internal::ops::predict_codes_autoregressive_coreml(TTSTransform
             code_probs[i] = expf(logits_ptr[i] - max_logit);
             sum += code_probs[i];
         }
+        if (!std::isfinite(sum) || sum <= 0.0) return -1;
         for (int32_t i = 0; i < vocab_size; ++i) {
             code_probs[i] = (float) (code_probs[i] / sum);
         }
 
         apply_top_p(code_probs.data(), vocab_size, top_p);
+        if (!sampling_probabilities_valid(code_probs.data(), vocab_size)) return -1;
         std::discrete_distribution<int32_t> dist(code_probs.begin(), code_probs.begin() + vocab_size);
         return dist(impl->residual_rng);
     };
@@ -187,6 +192,7 @@ bool transformer_internal::ops::predict_codes_autoregressive_coreml(TTSTransform
         }
 
         output[step] = sample_or_argmax(logits_data.data(), cfg.code_pred_vocab_size);
+        if (output[step] < 0) { self.error_msg_ = "Invalid residual sampling distribution"; return false; }
 
 #ifdef QWEN3_TTS_TIMING
         if (impl->timing) {
@@ -251,12 +257,14 @@ bool TTSTransformer::predict_codes_autoregressive(const float * hidden, int32_t 
     std::vector<float> code_probs(cfg.code_pred_vocab_size);
 
     auto sample_or_argmax = [&](float * logits_ptr, int32_t vocab_size) -> int32_t {
+        if (!sampling_logits_valid(logits_ptr, vocab_size)) return -1;
         if (temperature <= 0.0f) {
             return argmax_code_pred(logits_ptr, vocab_size);
         }
         for (int32_t i = 0; i < vocab_size; ++i) {
             logits_ptr[i] /= temperature;
         }
+        if (!sampling_logits_valid(logits_ptr, vocab_size)) return -1;
         if (top_k > 0 && top_k < vocab_size) {
             std::vector<std::pair<float, int32_t>> scored(vocab_size);
             for (int32_t i = 0; i < vocab_size; ++i) {
@@ -279,10 +287,12 @@ bool TTSTransformer::predict_codes_autoregressive(const float * hidden, int32_t 
             code_probs[i] = expf(logits_ptr[i] - max_logit);
             sum += code_probs[i];
         }
+        if (!std::isfinite(sum) || sum <= 0.0) return -1;
         for (int32_t i = 0; i < vocab_size; ++i) {
             code_probs[i] = (float) (code_probs[i] / sum);
         }
         apply_top_p(code_probs.data(), vocab_size, top_p);
+        if (!sampling_probabilities_valid(code_probs.data(), vocab_size)) return -1;
         std::discrete_distribution<int32_t> dist(code_probs.begin(), code_probs.begin() + vocab_size);
         return dist(impl_->residual_rng);
     };
@@ -402,6 +412,7 @@ bool TTSTransformer::predict_codes_autoregressive(const float * hidden, int32_t 
         }
 
         output[0] = sample_or_argmax(logits_data.data(), cfg.code_pred_vocab_size);
+        if (output[0] < 0) { error_msg_ = "Invalid residual sampling distribution"; return false; }
 
         ggml_backend_sched_reset(impl_->state.sched);
 #ifdef QWEN3_TTS_TIMING
@@ -479,7 +490,7 @@ bool TTSTransformer::predict_codes_autoregressive(const float * hidden, int32_t 
         struct ggml_tensor * inp_mask = ggml_graph_get_tensor(gf, "inp_mask");
         if (inp_mask) {
             ggml_backend_tensor_set(inp_mask, impl_->state.code_pred_mask.data(), 0,
-                                    impl_->state.code_pred_cache.n_ctx * sizeof(ggml_fp16_t));
+                                    inp_mask->ne[0] * sizeof(ggml_fp16_t));
         }
 #ifdef QWEN3_TTS_TIMING
         t1 = clk::now();
@@ -522,6 +533,7 @@ bool TTSTransformer::predict_codes_autoregressive(const float * hidden, int32_t 
         }
 
         output[step] = sample_or_argmax(logits_data.data(), cfg.code_pred_vocab_size);
+        if (output[step] < 0) { error_msg_ = "Invalid residual sampling distribution"; return false; }
 
         ggml_backend_sched_reset(impl_->state.sched);
 #ifdef QWEN3_TTS_TIMING

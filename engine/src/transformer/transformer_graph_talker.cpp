@@ -16,6 +16,8 @@ struct ggml_cgraph * transformer_internal::ops::build_prefill_forward_graph(TTST
     const float eps = cfg.rms_norm_eps;
     const float rope_theta = cfg.rope_theta;
     const int n_layer = cfg.n_layers;
+    const int32_t attention_ctx = n_past + n_tokens;
+    GGML_ASSERT(n_past >= 0 && attention_ctx > 0 && attention_ctx <= impl->state.cache.n_ctx);
 
     struct ggml_init_params params = {
         /*.mem_size   =*/ impl->state.compute_meta.size(),
@@ -105,11 +107,11 @@ struct ggml_cgraph * transformer_internal::ops::build_prefill_forward_graph(TTST
         ggml_build_forward_expand(gf, v_updated);
 
         struct ggml_tensor * K = ggml_view_3d(ctx0, k_cache,
-            head_dim, n_kv_head, impl->state.cache.n_ctx,
+            head_dim, n_kv_head, attention_ctx,
             k_cache->nb[1], k_cache->nb[2], 0);
 
         struct ggml_tensor * V = ggml_view_3d(ctx0, v_cache,
-            head_dim, n_kv_head, impl->state.cache.n_ctx,
+            head_dim, n_kv_head, attention_ctx,
             v_cache->nb[1], v_cache->nb[2], 0);
 
         struct ggml_tensor * Q = ggml_permute(ctx0, Qcur, 0, 2, 1, 3);
@@ -180,6 +182,8 @@ struct ggml_cgraph * transformer_internal::ops::build_step_graph(TTSTransformer 
     const float rope_theta = cfg.rope_theta;
     const int n_layer = cfg.n_layers;
     const int n_tokens = 1;
+    const int32_t attention_ctx = n_past + n_tokens;
+    GGML_ASSERT(n_past >= 0 && attention_ctx <= impl->state.cache.n_ctx);
 
     struct ggml_init_params params = {
         /*.mem_size   =*/ impl->state.compute_meta.size(),
@@ -205,7 +209,7 @@ struct ggml_cgraph * transformer_internal::ops::build_step_graph(TTSTransformer 
         ggml_set_input(inp_mrope_pos);
     }
 
-    struct ggml_tensor * inp_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, impl->state.cache.n_ctx, 1);
+    struct ggml_tensor * inp_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, attention_ctx, 1);
     ggml_set_name(inp_mask, "inp_mask");
     ggml_set_input(inp_mask);
 
@@ -273,11 +277,11 @@ struct ggml_cgraph * transformer_internal::ops::build_step_graph(TTSTransformer 
         ggml_build_forward_expand(gf, v_updated);
 
         struct ggml_tensor * K = ggml_view_3d(ctx0, k_cache,
-            head_dim, n_kv_head, impl->state.cache.n_ctx,
+            head_dim, n_kv_head, attention_ctx,
             k_cache->nb[1], k_cache->nb[2], 0);
 
         struct ggml_tensor * V = ggml_view_3d(ctx0, v_cache,
-            head_dim, n_kv_head, impl->state.cache.n_ctx,
+            head_dim, n_kv_head, attention_ctx,
             v_cache->nb[1], v_cache->nb[2], 0);
 
         struct ggml_tensor * Q = ggml_permute(ctx0, Qcur, 0, 2, 1, 3);

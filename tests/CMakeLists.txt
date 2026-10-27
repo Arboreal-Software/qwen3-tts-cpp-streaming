@@ -58,3 +58,13 @@ if(QWEN3_TTS_ENABLE_MODEL_TESTS)
         TIMEOUT 120
     )
 endif()
+
+add_executable(qwen3_sampling_safety_test sampling_safety_test.cpp)
+target_include_directories(qwen3_sampling_safety_test PRIVATE ${CMAKE_SOURCE_DIR}/engine/src)
+add_test(NAME sampling_safety COMMAND qwen3_sampling_safety_test)
+set_tests_properties(sampling_safety PROPERTIES LABELS "fast;contract")
+
+add_executable(qwen3_kv_active_extent_test kv_active_extent_test.cpp)
+target_link_libraries(qwen3_kv_active_extent_test PRIVATE ggml ggml-cpu)
+add_test(NAME kv_active_extent COMMAND qwen3_kv_active_extent_test)
+set_tests_properties(kv_active_extent PROPERTIES LABELS "fast;contract")
