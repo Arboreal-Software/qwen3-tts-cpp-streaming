@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <cstdlib>
+#include <mutex>
 
 namespace qwen3_tts {
 
@@ -10,6 +12,7 @@ namespace {
 struct shared_backend_state {
     ggml_backend_t backend = nullptr;
     int32_t ref_count = 0;
+    std::mutex lifecycle_mutex;
 };
 
 shared_backend_state & get_shared_backend_state() {
@@ -28,7 +31,12 @@ ggml_backend_t init_preferred_backend(const char * component_name, std::string *
     if (error_msg) error_msg->clear();
 
     auto & shared = get_shared_backend_state();
-    if (shared.backend) {
+    std::lock_guard<std::mutex> lock(shared.lifecycle_mutex);
+    // Qualification switch: each component gets its own mutable CUDA context.
+    // This isolates backend streams/pools, not concurrent use of one component.
+    const char * isolation = std::getenv("ARBOREAL_ISOLATED_BACKENDS");
+    const bool isolated = isolation && std::strcmp(isolation, "1") == 0;
+    if (!isolated && shared.backend) {
         shared.ref_count++;
         return shared.backend;
     }
@@ -49,7 +57,7 @@ ggml_backend_t init_preferred_backend(const char * component_name, std::string *
         *error_msg = "Failed to initialize backend (IGPU/GPU/ACCEL/CPU) for " + std::string(name);
     }
 
-    if (backend) {
+    if (backend && !isolated) {
         shared.backend = backend;
         shared.ref_count = 1;
     }
@@ -63,6 +71,7 @@ void release_preferred_backend(ggml_backend_t backend) {
     }
 
     auto & shared = get_shared_backend_state();
+    std::lock_guard<std::mutex> lock(shared.lifecycle_mutex);
     if (shared.backend == backend) {
         shared.ref_count--;
         if (shared.ref_count <= 0) {
