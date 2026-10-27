@@ -65,7 +65,12 @@ int main(int argc,char** argv) {
                 auto id=current;auto request=text;pending=false;lock.unlock();
                 TtsStreamOptions options;options.model_identifier="qwen3-tts-0.6b-f16";
                 options.seed=42;options.play_streaming=false;options.print_progress=false;
-                options.print_timing=false;options.paced_audio_delivery=false;
+                // Opt-in diagnostics stay on the bounded supervisor log pipe,
+                // never the binary audio/control pipe. Include engine EOS versus
+                // safety-limit termination when investigating incomplete speech.
+                const char* diagnostics=std::getenv("ARBOREAL_TTS_DIAGNOSTICS");
+                options.print_timing=diagnostics&&std::string(diagnostics)=="1";
+                options.paced_audio_delivery=false;
                 size_t emitted=0;
                 bool ok=engine.synthesize_streaming(request,options,[&](const TtsStreamChunk& chunk){
                     if(cancelled.load())return false;
