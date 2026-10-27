@@ -93,6 +93,12 @@ bool TTSTransformer::generate_streaming(const int32_t * text_tokens, int32_t n_t
     tts_timing timing = {};
     auto t_gen_start = clk::now();
     auto t0 = t_gen_start, t1 = t_gen_start;
+    // Clear the borrowed stack pointer on every return, including validation
+    // failures and cancellation. The owner must still serialize generations.
+    struct TimingReset {
+        tts_timing * & pointer;
+        ~TimingReset() { pointer = nullptr; }
+    } timing_reset{impl_->timing};
     impl_->timing = &timing;
 #endif
 
