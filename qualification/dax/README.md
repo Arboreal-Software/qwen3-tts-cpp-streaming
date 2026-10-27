@@ -49,6 +49,12 @@ weights to F32 for CUDA dispatch. The second synchronizes operator evaluation an
 changes timing; use it for placement, not throughput. Detailed generation timing
 is a separate QWEN3_TTS_TIMING CMake option.
 
+## Runtime blocker
+
+A subsequent instrumented candidate run aborted during streaming with CUDA illegal
+memory access. See [failure evidence](TTS-CUDA-FAILURE.md). Root cause is unknown;
+prior successful benchmarks do not establish stability. Do not deploy this candidate.
+
 ## Evidence and remaining gates
 
 Reports are snapshots from /home/claire/inference-setup/hosts/dax/qualification/;
