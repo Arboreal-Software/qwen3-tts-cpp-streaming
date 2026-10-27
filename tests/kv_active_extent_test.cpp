@@ -5,6 +5,11 @@
 #include "ggml.h"
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
+#ifdef ARBOREAL_TEST_CUDA
+#include "ggml-cuda.h"
+#endif
+#include <cstring>
+static bool use_cuda=false;
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -13,7 +18,11 @@
 
 std::vector<float> attention(int capacity,bool active_only,bool poison_tail) {
     constexpr int D=64,H=2,valid=2,queries=2;
-    auto backend=ggml_backend_cpu_init();assert(backend);
+    ggml_backend_t backend=nullptr;
+#ifdef ARBOREAL_TEST_CUDA
+    if(use_cuda)backend=ggml_backend_cuda_init(0);else
+#endif
+    backend=ggml_backend_cpu_init();assert(backend);
     auto ctx=ggml_init({4*1024*1024,nullptr,true});assert(ctx);
     auto Kcache=ggml_new_tensor_3d(ctx,GGML_TYPE_F16,D,H,capacity);
     auto Vcache=ggml_new_tensor_3d(ctx,GGML_TYPE_F16,D,H,capacity);
@@ -50,7 +59,11 @@ std::vector<float> attention(int capacity,bool active_only,bool poison_tail) {
     ggml_backend_buffer_free(buffer);ggml_free(ctx);ggml_backend_free(backend);
     return output;
 }
-int main() {
+int main(int argc,char **argv) {
+    use_cuda=argc>1&&std::strcmp(argv[1],"--cuda")==0;
+#ifndef ARBOREAL_TEST_CUDA
+    assert(!use_cuda);
+#endif
     const auto reference=attention(16,true,false);
     assert(std::all_of(reference.begin(),reference.end(),[](float x){return std::isfinite(x);}));
     for(int capacity:{16,511,512,513,3839,3840,3841}) {
@@ -64,5 +77,6 @@ int main() {
     const auto poisoned_full=attention(512,false,true);
     const bool contamination=std::any_of(poisoned_full.begin(),poisoned_full.end(),[](float x){return !std::isfinite(x);});
     assert(contamination); // Demonstrate the original full-capacity read hazard.
+    std::printf("backend=%s\n",use_cuda?"CUDA":"CPU");
     std::puts("KV tail poison: full-capacity attention contaminated; active-prefix attention invariant across7capacities");
 }

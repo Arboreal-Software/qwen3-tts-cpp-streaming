@@ -68,3 +68,8 @@ add_executable(qwen3_kv_active_extent_test kv_active_extent_test.cpp)
 target_link_libraries(qwen3_kv_active_extent_test PRIVATE ggml ggml-cpu)
 add_test(NAME kv_active_extent COMMAND qwen3_kv_active_extent_test)
 set_tests_properties(kv_active_extent PROPERTIES LABELS "fast;contract")
+
+if(QWEN3_TTS_CUDA)
+    target_link_libraries(qwen3_kv_active_extent_test PRIVATE ggml-cuda)
+    target_compile_definitions(qwen3_kv_active_extent_test PRIVATE ARBOREAL_TEST_CUDA=1)
+endif()
