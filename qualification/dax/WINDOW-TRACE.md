@@ -22,3 +22,13 @@ blaming the decoder. Cancelled B versus completed B remain separate controls.
 
 Both modified translation units pass C++17 syntax checking. Full Dax build and
 actual trace comparison remain pending; no live service uses this diagnostic.
+
+For generation localization, the probe also accepts DAX_PROBE_CAPTURE_DEBUG=1
+with an explicit QWEN3_TTS_DEBUG_DUMP_DIR and DAX_PROBE_TRACE_ROOT. It moves the
+upstream debug directory into each completed turn's generation/ directory, then
+recreates the original empty directory. This avoids overwriting prior-turn
+logits while preserving the upstream process-static debug config. No active
+writer remains when the move happens. Use a dedicated test output filesystem;
+no existing target is overwritten. Request e.g. MAX_FRAMES=58/MAX_CODE_STEPS=2
+to include the first differing residual code at frame57/codebook2. This remains
+public-fixture-only diagnostics, not production logging or performance evidence.

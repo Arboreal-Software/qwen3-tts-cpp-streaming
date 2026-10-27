@@ -37,6 +37,20 @@ int main(int argc,char**argv){
    return !cancel_requested;
   });
   auto ended=Clock::now();
+  if (const char * capture=std::getenv("DAX_PROBE_CAPTURE_DEBUG")) {
+   if (std::strcmp(capture,"1")==0) {
+    const char * root=std::getenv("DAX_PROBE_TRACE_ROOT");
+    const char * debug=std::getenv("QWEN3_TTS_DEBUG_DUMP_DIR");
+    if (!root || !debug || !*root || !*debug)return 6;
+    const auto dest=std::filesystem::path(root)/("turn-"+std::to_string(turn))/"generation";
+    // All debug writers have returned. Move instead of copying while the next
+    // request is writing, and do not delete or overwrite an earlier snapshot.
+    if (std::filesystem::exists(dest))return 6;
+    std::filesystem::rename(debug,dest);
+    if (!std::filesystem::create_directory(debug))return 6;
+   }
+  }
+
   std::string output=std::getenv("DAX_PROBE_OUTPUT")?std::getenv("DAX_PROBE_OUTPUT"):"/work";
   std::ofstream dump(output+"/persistent-pcm-turn-"+std::to_string(turn)+".f32",std::ios::binary);
   dump.write(reinterpret_cast<const char*>(pcm.data()),pcm.size()*sizeof(float));dump.close();
