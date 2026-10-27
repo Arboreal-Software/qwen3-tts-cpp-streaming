@@ -33,3 +33,12 @@ illegal access remains unlocalized and this experiment does not prove causation.
 Still required: timing-enabled build, sustained repeated/variable-length requests,
 cancellation/error/teardown, concurrent independent users and ASR coexistence.
 No live deployment or default change is authorized by this result alone.
+
+## Review caveat: memory-pool policy
+
+The follow-up GPT-6 Pro investigation identified a second variable in this
+comparison, confirmed in decoder/decoder_loader.cpp: the decoder disables VMM
+and graphs on its backend. Shared mode applies that policy to the transformer
+as well; isolated mode does not. Therefore these runs do not isolate ownership
+alone. A subsequent controlled comparison must match and record pool policy.
+No prior timing result is evidence that isolated ownership alone changes speed.
