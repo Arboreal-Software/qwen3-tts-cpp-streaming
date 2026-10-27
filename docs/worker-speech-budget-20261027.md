@@ -1,5 +1,41 @@
 # Worker speech duration budget
 
+## Superseding five-minute qualification
+
+The deployed 30-second worker ceiling described below was insufficient: two
+technical speech requests terminated after 29.976875 seconds of generated audio.
+Raising only the outer voice delivery allowance did not remove that inner limit.
+The worker now allows 3750 codec frames and 7,200,000 emitted 24 kHz samples.
+Natural EOS, cancellation fencing, bounded pipe writes, and explicit failure
+without replay remain unchanged. Service, supervisor and client request bounds
+were separately aligned to 300 seconds; the client's default queued-audio budget
+remains 30 seconds.
+
+On Dax's GTX1080, the new worker/service/client completed a 30.776875-second
+single sentence and a 92.330625-second three-sentence request. The latter took
+60.269 seconds to synthesize, first audio 398.6 ms, maximum inter-chunk gap
+524.3 ms. A technical filename/hash fixture completed in 13.416875 seconds of
+audio. Cancellation settled in 336 ms and two subsequent requests completed.
+These are synthetic-text transport/generation results, not human listening or
+pronunciation acceptance. Five full minutes of real speech was not generated.
+
+All 12 native protocol tests pass, including synthetic audio beyond 30 seconds,
+whole-frame rejection at the 300-second cap and cancellation/reuse. The actual
+Python3.10 service image passed 52 tests. Initial assertion/timeout-compatibility
+failures were corrected and retained in the qualification records.
+
+Qualified worker SHA256:
+`0d3b9231fcba32a92937c9ce90a09d5c011d9bb5dd5f1f9f789eae3b4147c1a2`.
+Service image:
+`sha256:ec66596174908d8541cb0f7f4cd109d67e98320656a1e9c5e804b1f7efb506f0`.
+Evidence: host setup repository `hosts/dax/qualification/tts-five-minute-v1/`,
+including collected real-GPU results and deployment receipt. Active Dax serving
+uses `~/voice-services/qualification/tts-five-minute-v1/build`; original worker,
+image and stopped container are retained for rollback. Model and Lana voice
+selection are unchanged.
+
+## Historical 30-second qualification
+
 The persistent worker's upstream five-audio-frames-per-text-token heuristic
 truncated an ordinary sentence at 70 frames, before natural EOS. Fresh and
 post-cancellation requests both reproduced it, so cancellation is not a necessary

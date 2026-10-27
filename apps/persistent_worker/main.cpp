@@ -14,6 +14,8 @@
 #include <unistd.h>
 
 namespace {
+constexpr size_t max_audio_samples = 24000 * 300;
+constexpr int max_audio_tokens = 3750; // 80 ms codec frames; five minutes.
 [[noreturn]] void fail() { _exit(70); } // Poisoned/unknown state is never reused.
 bool read_all(void* p, size_t n) {
     auto* b=static_cast<unsigned char*>(p);const size_t wanted=n;
@@ -67,10 +69,10 @@ int main(int argc,char** argv) {
                 options.seed=42;options.play_streaming=false;options.print_progress=false;
                 options.require_natural_eos=true;
                 // Text-token counts underestimate some ordinary spoken phrases.
-                // Use the voice transport's hard 30-second budget instead of
+                // Use the voice transport's hard five-minute budget instead of
                 // stopping valid speech at the upstream 5-frames/token heuristic.
                 // Each codec frame represents 80 ms; natural EOS is still required.
-                options.max_audio_tokens=375;
+                options.max_audio_tokens=max_audio_tokens;
                 options.max_audio_frames_per_text_token=0.0f;
                 // Opt-in diagnostics stay on the bounded supervisor log pipe,
                 // never the binary audio/control pipe. Include engine EOS versus
@@ -83,7 +85,7 @@ int main(int argc,char** argv) {
                     if(cancelled.load())return false;
                     if(chunk.sample_rate!=24000||chunk.samples.size()>65536)fail();
                     for(float v:chunk.samples)if(!std::isfinite(v))fail();
-                    if(chunk.samples.size()>720000-emitted)fail();
+                    if(emitted>max_audio_samples||chunk.samples.size()>max_audio_samples-emitted)fail();
                     if(!chunk.samples.empty()){emit(output,'A',id,chunk.samples.data(),uint32_t(chunk.samples.size()*sizeof(float)));emitted+=chunk.samples.size();}
                     return !cancelled.load();
                 });

@@ -11,11 +11,11 @@ struct Qwen3StreamingTts {
  bool load(const char*,const char*){return true;}
  bool load_speaker_embedding(const char*){return true;}
  template<class Callback> bool synthesize_streaming(const std::string& text,const TtsStreamOptions& options,Callback callback){
-  if(options.max_audio_tokens!=375||options.max_audio_frames_per_text_token!=0.0f)return false;
+  if(options.max_audio_tokens!=3750||options.max_audio_frames_per_text_token!=0.0f)return false;
   if(text=="fail")return false;if(text=="throw")throw std::runtime_error("fake native failure");
   if(text=="empty")return true;
-  for(int i=0;i<100;++i){
-   TtsStreamChunk chunk;chunk.samples.assign(text=="backpressure"||text=="duration-limit"?65536:32,text=="second"?.2f:.1f);
+  for(int i=0;i<(text=="duration-limit"?120:100);++i){
+   TtsStreamChunk chunk;chunk.samples.assign(text=="backpressure"||text=="duration-limit"||text=="long-success"?65536:32,text=="second"?.2f:.1f);
    if(!callback(chunk))return false;
    if(text=="limit"&&options.require_natural_eos)return false;
    std::this_thread::sleep_for(std::chrono::milliseconds(2));

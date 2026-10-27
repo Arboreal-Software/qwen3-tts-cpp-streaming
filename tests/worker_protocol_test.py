@@ -76,8 +76,18 @@ class Protocol(unittest.TestCase):
                 self.assertEqual((kind,identity),(b'A',1))
                 samples+=len(data)//4
         self.assertGreater(samples,0)
-        self.assertLessEqual(samples,720000)
+        self.assertGreater(samples,24000*300-65536)
+        self.assertLessEqual(samples,24000*300)
         self.assertEqual(self.w.p.wait(timeout=4),70)
+    def test_long_natural_completion_survives_thirty_seconds(self):
+        self.w.send(b'S',1,b'long-success');samples=0
+        while True:
+            kind,identity,data=self.w.event()
+            self.assertEqual(identity,1)
+            if kind==b'D':break
+            self.assertEqual(kind,b'A');samples+=len(data)//4
+        self.assertGreater(samples,24000*30)
+        self.assertEqual(samples,65536*100)
     def test_native_exception_is_fatal(self):
         self.w.send(b'S',1,b'throw');self.assertEqual(self.w.p.wait(timeout=4),70)
     def test_empty_success_is_fatal(self):
