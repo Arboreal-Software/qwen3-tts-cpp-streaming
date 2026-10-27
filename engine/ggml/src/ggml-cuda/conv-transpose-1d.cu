@@ -22,10 +22,11 @@ static  __global__ void conv_transpose_1d_kernel(
         int kernel_offset = (src0_ne0 * src0_ne1 * c) + (out_channel * src0_ne0);
         int64_t input_offset = batch * src1_nb2 + src1_ne0 * c;
 
-        for (int i = 0; i < src1_ne0; i++) {
-            if (!(idx >= i*s0 && idx < i*s0 + src0_ne0)) {
-                continue;
-            }
+        // Only input positions whose kernel overlaps this output contribute.
+        // Preserve increasing input order and FP32 accumulation semantics.
+        const int first = max(0, (idx - src0_ne0 + s0) / s0);
+        const int last = min(src1_ne0 - 1, idx / s0);
+        for (int i = first; i <= last; i++) {
             int weight_idx = idx - i*s0;
 
             float kernel_weight = src0[kernel_offset + weight_idx];
