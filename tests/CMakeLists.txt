@@ -1,3 +1,10 @@
+add_executable(qwen3_decoder_callback_scope_test decoder_callback_scope_test.cpp)
+target_compile_features(qwen3_decoder_callback_scope_test PRIVATE cxx_std_17)
+target_include_directories(qwen3_decoder_callback_scope_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/engine/src ${CMAKE_SOURCE_DIR}/engine/ggml/include)
+add_test(NAME decoder_callback_scope COMMAND qwen3_decoder_callback_scope_test)
+set_tests_properties(decoder_callback_scope PROPERTIES LABELS "fast;contract")
+
 add_executable(qwen3_wrapper_contract_test
     wrapper_contract_test.cpp
 )

@@ -185,6 +185,15 @@ bool Qwen3StreamingTts::synthesize_streaming(
         return false;
     }
 
+    if (options.require_natural_eos && !result.reached_eos) {
+        impl_->error = result.hit_dynamic_token_limit
+            ? "Generation reached the text-relative safety limit before EOS"
+            : result.hit_token_limit
+                ? "Generation reached the audio token limit before EOS"
+                : "Generation stopped before EOS";
+        return false;
+    }
+
     if (!options.output_wav.empty()) {
         const fs::path output_wav = fs::absolute(fs::path(options.output_wav));
         std::error_code ec;

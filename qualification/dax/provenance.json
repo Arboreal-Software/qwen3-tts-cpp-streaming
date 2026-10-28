@@ -1,0 +1,9 @@
+{
+  "upstream": "https://github.com/maxhorizons/qwen3-tts-cpp-streaming",
+  "baseline": "74422bab4998ad69e0a67ba105654dadbeec9b3a",
+  "ggml_baseline_tree": "b1e00d0467ff3e8a7ade3bc6031b756b4cfe0c13",
+  "dependency_kind": "vendored tracked GGML; no submodule",
+  "candidate_snapshot_sha256": "efeec5b966c3b1ea4150c9ff5e0f54f2735f96501a5b06f22adb8d86af1ff65b",
+  "modified_cuda_source_sha256": "80da6f8be04a9ef4b771819c06ee6afaf20094c2f0bb055a6049a570d2623efb",
+  "scope": "Engine patches match candidate; CPU target parameterized; qualification targets moved to opt-in repo-relative paths. No deployment qualification implied."
+}
